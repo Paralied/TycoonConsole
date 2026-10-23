@@ -269,26 +269,29 @@ Button 'Mods Folder' 596 454 118 40 {
 Button 'Refresh IP / Port' 28 504 150 34 { Refresh-Network } | Out-Null
 Button 'Check for Updates' 190 504 170 34 {
     try {
-        $r = Invoke-RestMethod 'https://api.github.com/repos/Paralied/TycoonConsole/releases/latest' -Headers @{ 'User-Agent' = 'TycoonConsole' } -TimeoutSec 8
-        $asset = $r.assets | Where-Object { $_.name -eq 'TycoonConsole-Source.zip' } | Select-Object -First 1
-        if (-not $r.tag_name -or -not $asset) {
-            [Windows.Forms.MessageBox]::Show('No installable release package was found yet. Push a commit to main and wait for the GitHub Actions release workflow to finish.', 'Update check') | Out-Null
-            return
-        }
+        # Use the current main-branch source archive. This works even when no GitHub
+        # Release exists yet (the previous updater incorrectly required a published release asset).
+        $sourceUrl = 'https://github.com/Paralied/TycoonConsole/archive/refs/heads/main.zip'
+        $temp = Join-Path $env:TEMP ('TycoonConsole-update-' + [guid]::NewGuid().ToString('N'))
+        New-Item -ItemType Directory -Path $temp -Force | Out-Null
+        $zip = Join-Path $temp 'source.zip'
+        Log 'Checking GitHub for the latest TycoonConsole source...'
+        Invoke-WebRequest -Uri $sourceUrl -OutFile $zip -TimeoutSec 90
+        Expand-Archive -LiteralPath $zip -DestinationPath $temp -Force
+        $sourceRoot = Get-ChildItem -LiteralPath $temp -Directory | Where-Object {
+            (Test-Path (Join-Path $_.FullName 'TycoonConsole.ps1')) -and
+            (Test-Path (Join-Path $_.FullName 'Start-TycoonConsole.bat'))
+        } | Select-Object -First 1
+        if (-not $sourceRoot) { throw 'GitHub source archive did not contain TycoonConsole.ps1 and Start-TycoonConsole.bat.' }
+
         $choice = [Windows.Forms.MessageBox]::Show(
-            ('Install TycoonConsole ' + $r.tag_name + '?' + [Environment]::NewLine + 'The console will close, back up the current launcher files, install the release source, then reopen.'),
+            ('Install the latest TycoonConsole from GitHub main?' + [Environment]::NewLine + 'Your current launcher files will be backed up before replacement.'),
             'TycoonConsole updater',
             [Windows.Forms.MessageBoxButtons]::YesNo
         )
-        if ($choice -ne [Windows.Forms.DialogResult]::Yes) { return }
-
-        $temp = Join-Path $env:TEMP ('TycoonConsole-update-' + [guid]::NewGuid().ToString('N'))
-        New-Item -ItemType Directory -Path $temp -Force | Out-Null
-        $zip = Join-Path $temp 'update.zip'
-        Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -TimeoutSec 60
-        Expand-Archive -LiteralPath $zip -DestinationPath $temp -Force
-        if (-not (Test-Path (Join-Path $temp 'TycoonConsole.ps1')) -or -not (Test-Path (Join-Path $temp 'Start-TycoonConsole.bat'))) {
-            throw 'The release archive did not contain the expected launcher files.'
+        if ($choice -ne [Windows.Forms.DialogResult]::Yes) {
+            Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
+            return
         }
 
         $helper = Join-Path $temp 'apply-update.cmd'
@@ -300,9 +303,9 @@ Button 'Check for Updates' 190 504 170 34 {
             'timeout /t 3 /nobreak >nul',
             'if exist "' + (Join-Path $root 'TycoonConsole.ps1') + '" copy /y "' + (Join-Path $root 'TycoonConsole.ps1') + '" "' + $scriptBackup + '" >nul',
             'if exist "' + (Join-Path $root 'Start-TycoonConsole.bat') + '" copy /y "' + (Join-Path $root 'Start-TycoonConsole.bat') + '" "' + $launcherBackup + '" >nul',
-            'copy /y "' + (Join-Path $temp 'TycoonConsole.ps1') + '" "' + (Join-Path $root 'TycoonConsole.ps1') + '" >nul',
+            'copy /y "' + (Join-Path $sourceRoot.FullName 'TycoonConsole.ps1') + '" "' + (Join-Path $root 'TycoonConsole.ps1') + '" >nul',
             'if errorlevel 1 goto failed',
-            'copy /y "' + (Join-Path $temp 'Start-TycoonConsole.bat') + '" "' + (Join-Path $root 'Start-TycoonConsole.bat') + '" >nul',
+            'copy /y "' + (Join-Path $sourceRoot.FullName 'Start-TycoonConsole.bat') + '" "' + (Join-Path $root 'Start-TycoonConsole.bat') + '" >nul',
             'if errorlevel 1 goto failed',
             'start "" "' + (Join-Path $root 'Start-TycoonConsole.bat') + '"',
             'exit /b 0',
@@ -312,7 +315,7 @@ Button 'Check for Updates' 190 504 170 34 {
         )
         [IO.File]::WriteAllLines($helper, $lines, [Text.Encoding]::ASCII)
         Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c', ('"' + $helper + '"')) -WorkingDirectory $root
-        Log ('Update ' + $r.tag_name + ' downloaded; closing console so the updater can replace launcher files.')
+        Log 'Latest source downloaded. Closing TycoonConsole so the updater can replace the launcher files.'
         $form.Close()
     } catch {
         [Windows.Forms.MessageBox]::Show(('Update failed: ' + $_.Exception.Message), 'TycoonConsole updater') | Out-Null
