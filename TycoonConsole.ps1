@@ -61,8 +61,8 @@ function Apply-MinehutSettings {
   if(Test-Path $paper) {
     Backup-Once $paper
     $raw=Get-Content -LiteralPath $paper -Raw
-    if($raw -match '(?m)^\s*proxy-protocol:\s*(true|false)\s*$') {
-      $raw=[regex]::Replace($raw,'(?m)^(\s*)proxy-protocol:\s*(true|false)\s*$','$1proxy-protocol: true')
+    if($raw -match '(?m)^[ \t]*proxy-protocol:[ \t]*(true|false)[ \t]*$') {
+      $raw=[regex]::Replace($raw,'(?m)^([ \t]*)proxy-protocol:[ \t]*(true|false)[ \t]*$','$1proxy-protocol: true')
     } elseif($raw -match '(?m)^proxies:\s*$') {
       $raw=[regex]::Replace($raw,'(?m)^proxies:\s*$','proxies:'+ [Environment]::NewLine+'  proxy-protocol: true',1)
     } else {
