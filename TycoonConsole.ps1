@@ -231,12 +231,17 @@ Button 'Start Server' 28 454 150 40 {
         return
     }
 
+    Log ('Selected server JAR: ' + $jar)
+    Log ('Server working folder: ' + $script:activeServerDir)
     $argsText = ($jvm + @('-jar', ('"' + $jar + '"'), 'nogui')) -join ' '
     try {
-        $script:serverProcess = Start-Process -FilePath $javaCommand.Source -ArgumentList $argsText -WorkingDirectory $script:activeServerDir -PassThru
-        $status.Text = 'Status: running (PID ' + $script:serverProcess.Id + ')'
+        # Keep a visible command window open so Java/Paper startup errors are not lost
+        # when the JVM exits immediately. The console remains interactive for "stop".
+        $cmdLine = '/k "cd /d ""' + $script:activeServerDir + '"" && ""' + $javaCommand.Source + '"" ' + $argsText + '"'
+        $script:serverProcess = Start-Process -FilePath $env:ComSpec -ArgumentList $cmdLine -WorkingDirectory $script:activeServerDir -PassThru
+        $status.Text = 'Status: server console open (check its window)'
         $status.ForeColor = 'LightGreen'
-        Log 'Server process launched with 6 GB maximum heap. Use the server console and type stop for safe shutdown.'
+        Log 'Opened a visible server console. If startup fails, the exact Java/Paper error should remain on screen.'
         Refresh-Network
     } catch {
         Log ('Start failed: ' + $_.Exception.Message + '. Confirm Java is installed and on PATH.')
