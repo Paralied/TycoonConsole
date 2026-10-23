@@ -111,7 +111,9 @@ Button 'Check for Updates' 190 504 170 34 {
      throw 'The release archive did not contain the expected launcher files.'
    }
    $helper=Join-Path $temp 'apply-update.cmd'
-   $lines=@('@echo off','setlocal','timeout /t 3 /nobreak >nul','copy /y "'+(Join-Path $temp 'TycoonConsole.ps1')+'" "'+(Join-Path $root 'TycoonConsole.ps1')+'" >nul','if errorlevel 1 goto failed','copy /y "'+(Join-Path $temp 'Start-TycoonConsole.bat')+'" "'+(Join-Path $root 'Start-TycoonConsole.bat')+'" >nul','if errorlevel 1 goto failed','start "" "'+(Join-Path $root 'Start-TycoonConsole.bat')+'"','exit /b 0',':failed','echo Update failed. Source files remain in "'+$temp+'".','pause')
+   $scriptBackup=Join-Path $root 'TycoonConsole.ps1.tycoonconsole.previous'
+   $launcherBackup=Join-Path $root 'Start-TycoonConsole.bat.tycoonconsole.previous'
+   $lines=@('@echo off','setlocal','timeout /t 3 /nobreak >nul','if exist "'+(Join-Path $root 'TycoonConsole.ps1')+'" copy /y "'+(Join-Path $root 'TycoonConsole.ps1')+'" "'+$scriptBackup+'" >nul','if exist "'+(Join-Path $root 'Start-TycoonConsole.bat')+'" copy /y "'+(Join-Path $root 'Start-TycoonConsole.bat')+'" "'+$launcherBackup+'" >nul','copy /y "'+(Join-Path $temp 'TycoonConsole.ps1')+'" "'+(Join-Path $root 'TycoonConsole.ps1')+'" >nul','if errorlevel 1 goto failed','copy /y "'+(Join-Path $temp 'Start-TycoonConsole.bat')+'" "'+(Join-Path $root 'Start-TycoonConsole.bat')+'" >nul','if errorlevel 1 goto failed','start "" "'+(Join-Path $root 'Start-TycoonConsole.bat')+'"','exit /b 0',':failed','echo Update failed. Source files remain in "'+$temp+'".','pause')
    [IO.File]::WriteAllLines($helper,$lines,[Text.Encoding]::ASCII)
    Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c',('"' + $helper + '"')) -WorkingDirectory $root
    Log ('Update '+$r.tag_name+' downloaded; closing console so the updater can replace launcher files.')
