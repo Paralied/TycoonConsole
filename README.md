@@ -54,7 +54,7 @@ Review Minehut's current official instructions before enabling these settings, a
 1. Download or clone this repository.
 2. Run `Start-TycoonConsole.bat`.
 3. Put your Paper server JAR in the `server` folder.
-4. Review `server.properties` and the Minecraft EULA. The console blocks startup until `eula=true` is set by the operator after accepting the EULA.
+4. The console creates `server/eula.txt` with `eula=false` if it is missing. Click **Open EULA**, read the official EULA, and only if you agree change `eula=false` to `eula=true` and save. The first Start Server attempt also opens the selected server JAR's EULA file in Notepad if acceptance is still missing.
 5. Use **Start Server** to launch the server.
 
 This remains an early source build, not a signed installer or compiled EXE. The automatic release workflow is now configured in the repository, but it must complete successfully once before the in-app updater has a release asset to download. The updater has not yet been exercised end-to-end on Windows, so test it with a backup copy first. The Windows UI and live Minehut connection have not been tested on your PC.
