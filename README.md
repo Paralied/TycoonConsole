@@ -8,11 +8,10 @@ A Windows control panel for a self-hosted Minecraft Java server, designed for th
 - Reads the Minecraft server port from `server.properties` (default: 25565).
 - Shows the public IPv4 address when an external IP lookup is reachable.
 - Starts a selected Java server JAR with a 6 GB maximum heap.
-- Detects LAN IPv4, public IPv4 (when the lookup service is reachable), and configured server port.
-- Offers an opt-in Minehut mode for standalone Paper: adds Minehut JVM flags and updates the two documented settings, making one-time `.tycoonconsole.bak` backups before edits.
+- Offers an opt-in Minehut mode for standalone Paper: adds Minehut JVM flags and updates the documented settings, making one-time `.tycoonconsole.bak` backups before edits.
 - Opens the server, plugins, and mods folders.
-- Includes an in-app updater that downloads the published source ZIP, backs up the current launcher files, replaces the source launcher, and reopens the app.
-- Packages release ZIPs through GitHub Actions when a `v*` tag is pushed.
+- Includes an in-app updater that downloads `TycoonConsole-Source.zip` from the latest GitHub release, backs up the current launcher files, replaces the source launcher, and reopens the app.
+- GitHub Actions automatically refreshes the rolling `TycoonConsole Latest` release whenever code is pushed to `main`. The in-app updater checks that release. Pushing a version tag such as `v1.0.0` also creates a versioned release.
 
 ## Important: Minehut external hosting
 
@@ -58,7 +57,7 @@ Review Minehut's current official instructions before enabling these settings, a
 4. Review `server.properties` and the Minecraft EULA. The console blocks startup until `eula=true` is set by the operator after accepting the EULA.
 5. Use **Start Server** to launch the server.
 
-This remains an early source build, not a signed installer or compiled EXE. The updater requires a published GitHub release containing `TycoonConsole-Source.zip`; the workflow creates that asset when a `v*` tag is pushed. The updater has not yet been exercised end-to-end on Windows, so test it with a backup copy first. The Windows UI and live Minehut connection have not been tested on your PC.
+This remains an early source build, not a signed installer or compiled EXE. The automatic release workflow is now configured in the repository, but it must complete successfully once before the in-app updater has a release asset to download. The updater has not yet been exercised end-to-end on Windows, so test it with a backup copy first. The Windows UI and live Minehut connection have not been tested on your PC.
 
 ## Mods and plugins
 
