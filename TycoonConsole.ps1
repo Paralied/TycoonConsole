@@ -326,7 +326,7 @@ Button 'Install Paper 1.21.11' 210 584 190 34 {
     try {
         $paperVersion = '1.21.11'
         $versionInfo = Invoke-RestMethod -Uri ('https://api.papermc.io/v2/projects/paper/versions/' + $paperVersion) -TimeoutSec 15
-        $build = $versionInfo.builds | Sort-Object -Descending | Select-Object -Last 1
+        $build = $versionInfo.builds | Sort-Object -Descending | Select-Object -First 1
         if (-not $build) { throw ('No Paper builds were listed for Minecraft ' + $paperVersion + '.') }
         $buildInfo = Invoke-RestMethod -Uri ('https://api.papermc.io/v2/projects/paper/versions/' + $paperVersion + '/builds/' + $build) -TimeoutSec 15
         $jarName = $buildInfo.downloads.application.name
