@@ -97,7 +97,7 @@ Button 'Check for Updates' 190 504 170 34 {
    $r=Invoke-RestMethod 'https://api.github.com/repos/Paralied/TycoonConsole/releases/latest' -Headers @{'User-Agent'='TycoonConsole'} -TimeoutSec 8
    $asset=$r.assets | Where-Object { $_.name -eq 'TycoonConsole-Source.zip' } | Select-Object -First 1
    if(-not $r.tag_name -or -not $asset) {
-     [Windows.Forms.MessageBox]::Show('No installable release package was found yet. Publish a v* tag to build the update package.','Update check')|Out-Null
+     [Windows.Forms.MessageBox]::Show('No installable release package was found yet. Push a commit to main and wait for the GitHub Actions release workflow to finish.','Update check')|Out-Null
      return
    }
    $choice=[Windows.Forms.MessageBox]::Show(('Install TycoonConsole '+$r.tag_name+'?'+[Environment]::NewLine+'The console will close, back up the current launcher files, install the release source, then reopen.'),'TycoonConsole updater',[Windows.Forms.MessageBoxButtons]::YesNo)
