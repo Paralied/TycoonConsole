@@ -93,7 +93,33 @@ Button 'Plugins Folder' 464 454 120 40 {Start-Process explorer.exe $pluginsDir}|
 Button 'Mods Folder' 596 454 118 40 {Start-Process explorer.exe $modsDir}|Out-Null
 Button 'Refresh IP / Port' 28 504 150 34 {Refresh-Network}|Out-Null
 Button 'Check for Updates' 190 504 170 34 {
- try{$r=Invoke-RestMethod 'https://api.github.com/repos/Paralied/TycoonConsole/releases/latest' -Headers @{'User-Agent'='TycoonConsole'} -TimeoutSec 8;if($r.tag_name){$a=[Windows.Forms.MessageBox]::Show(('Latest release: '+$r.tag_name+[Environment]::NewLine+$r.html_url+[Environment]::NewLine+'Open release page? Automatic replacement is not implemented in this source scaffold.'),'Update check',[Windows.Forms.MessageBoxButtons]::YesNo);if($a -eq [Windows.Forms.DialogResult]::Yes){Start-Process $r.html_url}}else{[Windows.Forms.MessageBox]::Show('No published release found yet.')|Out-Null}}catch{[Windows.Forms.MessageBox]::Show('Could not check GitHub Releases. Try again later.')|Out-Null}
+ try {
+   $r=Invoke-RestMethod 'https://api.github.com/repos/Paralied/TycoonConsole/releases/latest' -Headers @{'User-Agent'='TycoonConsole'} -TimeoutSec 8
+   $asset=$r.assets | Where-Object { $_.name -eq 'TycoonConsole-Source.zip' } | Select-Object -First 1
+   if(-not $r.tag_name -or -not $asset) {
+     [Windows.Forms.MessageBox]::Show('No installable release package was found yet. Publish a v* tag to build the update package.','Update check')|Out-Null
+     return
+   }
+   $choice=[Windows.Forms.MessageBox]::Show(('Install TycoonConsole '+$r.tag_name+'?'+[Environment]::NewLine+'The console will close, back up the current launcher files, install the release source, then reopen.'),'TycoonConsole updater',[Windows.Forms.MessageBoxButtons]::YesNo)
+   if($choice -ne [Windows.Forms.DialogResult]::Yes){return}
+   $temp=Join-Path $env:TEMP ('TycoonConsole-update-'+[guid]::NewGuid().ToString('N'))
+   New-Item -ItemType Directory -Path $temp -Force | Out-Null
+   $zip=Join-Path $temp 'update.zip'
+   Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -TimeoutSec 60
+   Expand-Archive -LiteralPath $zip -DestinationPath $temp -Force
+   if(-not(Test-Path (Join-Path $temp 'TycoonConsole.ps1')) -or -not(Test-Path (Join-Path $temp 'Start-TycoonConsole.bat'))) {
+     throw 'The release archive did not contain the expected launcher files.'
+   }
+   $helper=Join-Path $temp 'apply-update.cmd'
+   $lines=@('@echo off','setlocal','timeout /t 3 /nobreak >nul','copy /y "'+(Join-Path $temp 'TycoonConsole.ps1')+'" "'+(Join-Path $root 'TycoonConsole.ps1')+'" >nul','if errorlevel 1 goto failed','copy /y "'+(Join-Path $temp 'Start-TycoonConsole.bat')+'" "'+(Join-Path $root 'Start-TycoonConsole.bat')+'" >nul','if errorlevel 1 goto failed','start "" "'+(Join-Path $root 'Start-TycoonConsole.bat')+'"','exit /b 0',':failed','echo Update failed. Source files remain in "'+$temp+'".','pause')
+   [IO.File]::WriteAllLines($helper,$lines,[Text.Encoding]::ASCII)
+   Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c',('"' + $helper + '"')) -WorkingDirectory $root
+   Log ('Update '+$r.tag_name+' downloaded; closing console so the updater can replace launcher files.')
+   $form.Close()
+ } catch {
+   [Windows.Forms.MessageBox]::Show(('Update failed: '+$_.Exception.Message),'TycoonConsole updater')|Out-Null
+   Log ('Update failed: '+$_.Exception.Message)
+ }
 }|Out-Null
 Button 'Open GitHub' 372 504 130 34 {Start-Process 'https://github.com/Paralied/TycoonConsole'}|Out-Null
 Label 'Paper plugins go in plugins\. Fabric/Forge mods need a compatible loader; Paper cannot load them.' 28 548 710 28 8 | Out-Null
