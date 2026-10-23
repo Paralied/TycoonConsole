@@ -11,7 +11,8 @@ A Windows control panel for a self-hosted Minecraft Java server, designed for th
 - Detects LAN IPv4, public IPv4 (when the lookup service is reachable), and configured server port.
 - Offers an opt-in Minehut mode for standalone Paper: adds Minehut JVM flags and updates the two documented settings, making one-time `.tycoonconsole.bak` backups before edits.
 - Opens the server, plugins, and mods folders.
-- Includes a button to check the GitHub Releases page.
+- Includes an in-app updater that downloads the published source ZIP, backs up the current launcher files, replaces the source launcher, and reopens the app.
+- Packages release ZIPs through GitHub Actions when a `v*` tag is pushed.
 
 ## Important: Minehut external hosting
 
@@ -57,7 +58,7 @@ Review Minehut's current official instructions before enabling these settings, a
 4. Review `server.properties` and the Minecraft EULA. The console blocks startup until `eula=true` is set by the operator after accepting the EULA.
 5. Use **Start Server** to launch the server.
 
-This remains an early source build, not a signed installer or compiled EXE. The updater currently checks for a published GitHub release; automatic download, verification, and installation still need to be implemented. The Windows UI and live Minehut connection have not been tested on your PC.
+This remains an early source build, not a signed installer or compiled EXE. The updater requires a published GitHub release containing `TycoonConsole-Source.zip`; the workflow creates that asset when a `v*` tag is pushed. The updater has not yet been exercised end-to-end on Windows, so test it with a backup copy first. The Windows UI and live Minehut connection have not been tested on your PC.
 
 ## Mods and plugins
 
