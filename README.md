@@ -8,6 +8,8 @@ A Windows control panel for a self-hosted Minecraft Java server, designed for th
 - Reads the Minecraft server port from `server.properties` (default: 25565).
 - Shows the public IPv4 address when an external IP lookup is reachable.
 - Starts a selected Java server JAR with a 6 GB maximum heap.
+- Detects LAN IPv4, public IPv4 (when the lookup service is reachable), and configured server port.
+- Offers an opt-in Minehut mode for standalone Paper: adds Minehut JVM flags and updates the two documented settings, making one-time `.tycoonconsole.bak` backups before edits.
 - Opens the server, plugins, and mods folders.
 - Includes a button to check the GitHub Releases page.
 
@@ -31,7 +33,7 @@ For standalone Paper, Minehut currently instructs operators to:
    ```
 4. In Minehut's External Server Settings, enter the public IP and the actual reachable Minecraft port, select proxy type **Other** for standalone Paper, and select DNS record type **Port** unless you have correctly configured an SRV record.
 
-Review Minehut's current official instructions before enabling these settings, as they may change. Do not expose Remote Desktop or other administrative ports to the internet.
+Review Minehut's current official instructions before enabling these settings, as they may change. The checkbox in this early console build is intended only for standalone Paper without TCPShield; it is not suitable for Velocity/Waterfall or a TCPShield setup. The console may need the server to have been started once before `paper-global.yml` exists. Inspect the generated config after enabling this option. Do not expose Remote Desktop or other administrative ports to the internet.
 
 ### Finding the right IP and port
 
@@ -55,7 +57,7 @@ Review Minehut's current official instructions before enabling these settings, a
 4. Review `server.properties` and the Minecraft EULA. The console blocks startup until `eula=true` is set by the operator after accepting the EULA.
 5. Use **Start Server** to launch the server.
 
-This is an initial source scaffold, not a signed installer or compiled EXE. The updater currently checks for a published GitHub release; automatic download, verification, and installation still need to be implemented.
+This remains an early source build, not a signed installer or compiled EXE. The updater currently checks for a published GitHub release; automatic download, verification, and installation still need to be implemented. The Windows UI and live Minehut connection have not been tested on your PC.
 
 ## Mods and plugins
 
