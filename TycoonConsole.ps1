@@ -73,14 +73,41 @@ function Refresh-Network {
     }
     Log 'Network refreshed. A detected public IP does not guarantee inbound reachability.'
 }
+function Save-ConfiguredJar($path) {
+    if ([string]::IsNullOrWhiteSpace($path)) { return }
+    [IO.File]::WriteAllText((Join-Path $root 'server-jar.txt'), $path.Trim())
+}
 function Pick-Jar {
-    $jars = @(Get-ChildItem -LiteralPath $script:activeServerDir -Filter '*.jar' -File -ErrorAction SilentlyContinue)
-    if ($jars.Count -eq 1) { return $jars[0].FullName }
+    $jarConfig = Join-Path $root 'server-jar.txt'
+    if (Test-Path -LiteralPath $jarConfig) {
+        $savedJar = (Get-Content -LiteralPath $jarConfig -Raw).Trim()
+        if ($savedJar -and (Test-Path -LiteralPath $savedJar -PathType Leaf) -and ([IO.Path]::GetExtension($savedJar) -ieq '.jar')) {
+            return $savedJar
+        }
+    }
+
+    # Automatically find a server JAR in the app folder or its default server folder.
+    $searchDirs = @($script:activeServerDir, $root) | Select-Object -Unique
+    $jars = @()
+    foreach ($dir in $searchDirs) {
+        if (Test-Path -LiteralPath $dir -PathType Container) {
+            $jars += @(Get-ChildItem -LiteralPath $dir -Filter '*.jar' -File -ErrorAction SilentlyContinue)
+        }
+    }
+    $jars = @($jars | Sort-Object -Property FullName -Unique)
+    if ($jars.Count -eq 1) {
+        Save-ConfiguredJar $jars[0].FullName
+        return $jars[0].FullName
+    }
+
     $dlg = New-Object Windows.Forms.OpenFileDialog
-    $dlg.Title = 'Select Minecraft server JAR'
+    $dlg.Title = 'Select your Minecraft SERVER JAR (Paper server jar, not a client/mod jar)'
     $dlg.Filter = 'Java archives (*.jar)|*.jar'
     $dlg.InitialDirectory = $script:activeServerDir
-    if ($dlg.ShowDialog() -eq [Windows.Forms.DialogResult]::OK) { return $dlg.FileName }
+    if ($dlg.ShowDialog() -eq [Windows.Forms.DialogResult]::OK) {
+        Save-ConfiguredJar $dlg.FileName
+        return $dlg.FileName
+    }
     return $null
 }
 function Backup-Once($path) {
@@ -157,7 +184,16 @@ Button 'Start Server' 28 454 150 40 {
     }
 
     $jar = Pick-Jar
-    if (-not $jar) { Log 'No server JAR selected.'; return }
+    if (-not $jar) {
+        Log 'No server JAR selected. Put a Paper server .jar in the app folder or server folder, or select one when prompted.'
+        return
+    }
+    if (-not (Test-Path -LiteralPath $jar -PathType Leaf)) {
+        Remove-Item -LiteralPath (Join-Path $root 'server-jar.txt') -Force -ErrorAction SilentlyContinue
+        Log 'The saved server JAR path no longer exists. Removed the saved selection; click Start Server to choose a valid server JAR.'
+        [Windows.Forms.MessageBox]::Show('The previously selected server JAR could not be found. It has been cleared. Click Start Server again and select your Paper server .jar.', 'Server JAR not found') | Out-Null
+        return
+    }
 
     $script:activeServerDir = Split-Path -Parent $jar
     $eula = Join-Path $script:activeServerDir 'eula.txt'
@@ -187,9 +223,17 @@ Button 'Start Server' 28 454 150 40 {
         Log 'Minehut authentication JVM flags enabled. Use only for standalone Paper without TCPShield, as directed by Minehut.'
     }
 
+    $javaCommand = Get-Command 'java.exe' -ErrorAction SilentlyContinue
+    if (-not $javaCommand) { $javaCommand = Get-Command 'java' -ErrorAction SilentlyContinue }
+    if (-not $javaCommand) {
+        Log 'Start failed: Java was not found on PATH. Install Java 21, then reopen TycoonConsole.'
+        [Windows.Forms.MessageBox]::Show('Java was not found. Install Java 21 and make sure java.exe is available on PATH, then reopen TycoonConsole.', 'Java required') | Out-Null
+        return
+    }
+
     $argsText = ($jvm + @('-jar', ('"' + $jar + '"'), 'nogui')) -join ' '
     try {
-        $script:serverProcess = Start-Process -FilePath 'java' -ArgumentList $argsText -WorkingDirectory $script:activeServerDir -PassThru
+        $script:serverProcess = Start-Process -FilePath $javaCommand.Source -ArgumentList $argsText -WorkingDirectory $script:activeServerDir -PassThru
         $status.Text = 'Status: running (PID ' + $script:serverProcess.Id + ')'
         $status.ForeColor = 'LightGreen'
         Log 'Server process launched with 6 GB maximum heap. Use the server console and type stop for safe shutdown.'
