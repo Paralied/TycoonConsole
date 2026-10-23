@@ -322,6 +322,29 @@ Button 'Open EULA' 512 504 110 34 {
     }
     Start-Process -FilePath 'notepad.exe' -ArgumentList ('"' + $ep + '"')
 } | Out-Null
+Button 'Install Paper 1.21.11' 210 584 190 34 {
+    try {
+        $paperVersion = '1.21.11'
+        $versionInfo = Invoke-RestMethod -Uri ('https://api.papermc.io/v2/projects/paper/versions/' + $paperVersion) -TimeoutSec 15
+        $build = $versionInfo.builds | Sort-Object -Descending | Select-Object -Last 1
+        if (-not $build) { throw ('No Paper builds were listed for Minecraft ' + $paperVersion + '.') }
+        $buildInfo = Invoke-RestMethod -Uri ('https://api.papermc.io/v2/projects/paper/versions/' + $paperVersion + '/builds/' + $build) -TimeoutSec 15
+        $jarName = $buildInfo.downloads.application.name
+        if (-not $jarName) { throw 'Paper did not return a server JAR download name.' }
+        New-Item -ItemType Directory -Force -Path $serverDir | Out-Null
+        $jarPath = Join-Path $serverDir $jarName
+        Log ('Downloading Paper ' + $paperVersion + ' build ' + $build + '...')
+        Invoke-WebRequest -Uri ('https://api.papermc.io/v2/projects/paper/versions/' + $paperVersion + '/builds/' + $build + '/downloads/' + $jarName) -OutFile $jarPath -TimeoutSec 120
+        Save-ConfiguredJar $jarPath
+        $script:activeServerDir = $serverDir
+        Refresh-Network
+        Log ('Paper server JAR installed: ' + $jarPath)
+        [Windows.Forms.MessageBox]::Show(('Paper ' + $paperVersion + ' is installed. Click Start Server, then read and accept the Minecraft EULA when prompted.'), 'Paper installed') | Out-Null
+    } catch {
+        Log ('Paper download failed: ' + $_.Exception.Message)
+        [Windows.Forms.MessageBox]::Show(('Could not download Paper automatically: ' + $_.Exception.Message + [Environment]::NewLine + 'You can still select an existing Paper server .jar with Change Server JAR.'), 'Paper download failed') | Out-Null
+    }
+} | Out-Null
 Button 'Change Server JAR' 28 584 170 34 {
     $dlg = New-Object Windows.Forms.OpenFileDialog
     $dlg.Title = 'Choose Minecraft SERVER JAR'
