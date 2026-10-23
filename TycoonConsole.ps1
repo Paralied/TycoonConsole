@@ -322,6 +322,19 @@ Button 'Open EULA' 512 504 110 34 {
     }
     Start-Process -FilePath 'notepad.exe' -ArgumentList ('"' + $ep + '"')
 } | Out-Null
+Button 'Change Server JAR' 28 584 170 34 {
+    $dlg = New-Object Windows.Forms.OpenFileDialog
+    $dlg.Title = 'Choose Minecraft SERVER JAR'
+    $dlg.Filter = 'Java archives (*.jar)|*.jar'
+    $dlg.InitialDirectory = $script:activeServerDir
+    if ($dlg.ShowDialog() -eq [Windows.Forms.DialogResult]::OK) {
+        Save-ConfiguredJar $dlg.FileName
+        $script:activeServerDir = Split-Path -Parent $dlg.FileName
+        Log ('Saved server JAR: ' + $dlg.FileName)
+        Refresh-Network
+        [Windows.Forms.MessageBox]::Show('Server JAR saved. You will not need to select it again unless you move or replace the file.', 'Server JAR saved') | Out-Null
+    }
+} | Out-Null
 Label 'Paper plugins go in plugins\. Fabric/Forge mods need a compatible loader; Paper cannot load them.' 28 548 710 28 8 | Out-Null
 
 Refresh-Network
