@@ -6,6 +6,8 @@ $serverDir = Join-Path $root 'server'
 $pluginsDir = Join-Path $serverDir 'plugins'
 $modsDir = Join-Path $serverDir 'mods'
 foreach ($d in @($serverDir,$pluginsDir,$modsDir)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
+$defaultEula = Join-Path $serverDir 'eula.txt'
+if (-not (Test-Path $defaultEula)) { [IO.File]::WriteAllText($defaultEula, "# Read https://aka.ms/MinecraftEULA before accepting."+[Environment]::NewLine+'eula=false'+[Environment]::NewLine) }
 $form = New-Object Windows.Forms.Form
 $form.Text = 'TycoonConsole'; $form.Size = New-Object Drawing.Size(780,650); $form.MinimumSize=New-Object Drawing.Size(780,650); $form.StartPosition='CenterScreen'
 $form.BackColor=[Drawing.Color]::FromArgb(20,22,29); $form.ForeColor=[Drawing.Color]::Gainsboro
@@ -77,7 +79,60 @@ Button 'Start Server' 28 454 150 40 {
   $jar=Pick-Jar; if(-not $jar){Log 'No server JAR selected.';return}
   $eula=Join-Path (Split-Path $jar -Parent) 'eula.txt'
   if(-not(Test-Path $eula)){[IO.File]::WriteAllText($eula,"# Read https://aka.ms/MinecraftEULA before accepting."+[Environment]::NewLine+'eula=false'+[Environment]::NewLine)}
-  if((Get-Content $eula -Raw) -notmatch '(?m)^eula=true\s*$'){[Windows.Forms.MessageBox]::Show('Read the Minecraft EULA. If you agree, set eula=true in the server\eula.txt file and click Start again.','EULA required')|Out-Null;Log 'Start blocked until EULA is accepted.';return}
+  if((Get-Content $eula -Raw) -notmatch '(?m)^eula=true\s*
+  if($minehut.Checked) { Apply-MinehutSettings }
+  $jvm=@('-Xms2G','-Xmx6G')
+  if($minehut.Checked) {
+    $jvm+=@('-Dminecraft.api.services.host=https://api.minecraftservices.com/','-Dminecraft.api.auth.host=https://authserver.mojang.com/','-Dminecraft.api.account.host=https://api.mojang.com/','-Dminecraft.api.profiles.host=https://api.mojang.com/','-Dminecraft.api.session.host=https://api.minehut.com/mitm/proxy')
+    Log 'Minehut authentication JVM flags enabled. Use only for standalone Paper without TCPShield, as directed by Minehut.'
+  }
+  $argsText=($jvm+@('-jar',('"'+$jar+'"'),'nogui')) -join ' '
+  try{$script:serverProcess=Start-Process -FilePath 'java' -ArgumentList $argsText -WorkingDirectory (Split-Path $jar -Parent) -PassThru; $status.Text='Status: running (PID '+$script:serverProcess.Id+')';$status.ForeColor='LightGreen';Log 'Server process launched with 6 GB maximum heap. Use its console window and type stop for safe shutdown.'}catch{Log ('Start failed: '+$_.Exception.Message+'. Confirm Java is installed and on PATH.')}
+} | Out-Null
+Button 'Stop Server' 190 454 130 40 {if($script:serverProcess -and -not $script:serverProcess.HasExited){[Windows.Forms.MessageBox]::Show('For safe shutdown, type stop in the server console. Force-closing may corrupt world data.')|Out-Null}else{Log 'No server process running.'}}|Out-Null
+Button 'Server Folder' 332 454 120 40 {Start-Process explorer.exe $serverDir}|Out-Null
+Button 'Open EULA' 374 504 120 34 { $ep=Join-Path $serverDir 'eula.txt'; if(-not(Test-Path $ep)){[IO.File]::WriteAllText($ep,"# Read https://aka.ms/MinecraftEULA before accepting."+[Environment]::NewLine+'eula=false'+[Environment]::NewLine)}; Start-Process notepad.exe -ArgumentList ('"'+$ep+'"') }|Out-Null
+Button 'Plugins Folder' 464 454 120 40 {Start-Process explorer.exe $pluginsDir}|Out-Null
+Button 'Mods Folder' 596 454 118 40 {Start-Process explorer.exe $modsDir}|Out-Null
+Button 'Refresh IP / Port' 28 504 150 34 {Refresh-Network}|Out-Null
+Button 'Check for Updates' 190 504 170 34 {
+ try {
+   $r=Invoke-RestMethod 'https://api.github.com/repos/Paralied/TycoonConsole/releases/latest' -Headers @{'User-Agent'='TycoonConsole'} -TimeoutSec 8
+   $asset=$r.assets | Where-Object { $_.name -eq 'TycoonConsole-Source.zip' } | Select-Object -First 1
+   if(-not $r.tag_name -or -not $asset) {
+     [Windows.Forms.MessageBox]::Show('No installable release package was found yet. Push a commit to main and wait for the GitHub Actions release workflow to finish.','Update check')|Out-Null
+     return
+   }
+   $choice=[Windows.Forms.MessageBox]::Show(('Install TycoonConsole '+$r.tag_name+'?'+[Environment]::NewLine+'The console will close, back up the current launcher files, install the release source, then reopen.'),'TycoonConsole updater',[Windows.Forms.MessageBoxButtons]::YesNo)
+   if($choice -ne [Windows.Forms.DialogResult]::Yes){return}
+   $temp=Join-Path $env:TEMP ('TycoonConsole-update-'+[guid]::NewGuid().ToString('N'))
+   New-Item -ItemType Directory -Path $temp -Force | Out-Null
+   $zip=Join-Path $temp 'update.zip'
+   Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zip -TimeoutSec 60
+   Expand-Archive -LiteralPath $zip -DestinationPath $temp -Force
+   if(-not(Test-Path (Join-Path $temp 'TycoonConsole.ps1')) -or -not(Test-Path (Join-Path $temp 'Start-TycoonConsole.bat'))) {
+     throw 'The release archive did not contain the expected launcher files.'
+   }
+   $helper=Join-Path $temp 'apply-update.cmd'
+   $scriptBackup=Join-Path $root 'TycoonConsole.ps1.tycoonconsole.previous'
+   $launcherBackup=Join-Path $root 'Start-TycoonConsole.bat.tycoonconsole.previous'
+   $lines=@('@echo off','setlocal','timeout /t 3 /nobreak >nul','if exist "'+(Join-Path $root 'TycoonConsole.ps1')+'" copy /y "'+(Join-Path $root 'TycoonConsole.ps1')+'" "'+$scriptBackup+'" >nul','if exist "'+(Join-Path $root 'Start-TycoonConsole.bat')+'" copy /y "'+(Join-Path $root 'Start-TycoonConsole.bat')+'" "'+$launcherBackup+'" >nul','copy /y "'+(Join-Path $temp 'TycoonConsole.ps1')+'" "'+(Join-Path $root 'TycoonConsole.ps1')+'" >nul','if errorlevel 1 goto failed','copy /y "'+(Join-Path $temp 'Start-TycoonConsole.bat')+'" "'+(Join-Path $root 'Start-TycoonConsole.bat')+'" >nul','if errorlevel 1 goto failed','start "" "'+(Join-Path $root 'Start-TycoonConsole.bat')+'"','exit /b 0',':failed','echo Update failed. Source files remain in "'+$temp+'".','pause')
+   [IO.File]::WriteAllLines($helper,$lines,[Text.Encoding]::ASCII)
+   Start-Process -FilePath 'cmd.exe' -ArgumentList @('/c',('"' + $helper + '"')) -WorkingDirectory $root
+   Log ('Update '+$r.tag_name+' downloaded; closing console so the updater can replace launcher files.')
+   $form.Close()
+ } catch {
+   [Windows.Forms.MessageBox]::Show(('Update failed: '+$_.Exception.Message),'TycoonConsole updater')|Out-Null
+   Log ('Update failed: '+$_.Exception.Message)
+ }
+}|Out-Null
+Button 'Open GitHub' 372 504 130 34 {Start-Process 'https://github.com/Paralied/TycoonConsole'}|Out-Null
+Label 'Paper plugins go in plugins\. Fabric/Forge mods need a compatible loader; Paper cannot load them.' 28 548 710 28 8 | Out-Null
+Refresh-Network
+Log 'Ready. For 32 GB system RAM and 10–20 players, 6 GB maximum heap is a reasonable baseline.'
+Log 'Minehut mode is opt-in and only for standalone Paper; it edits settings with backups. Verify reachability separately.'
+[void]$form.ShowDialog()
+){[Windows.Forms.MessageBox]::Show(('The EULA file is here:'+[Environment]::NewLine+$eula+[Environment]::NewLine+[Environment]::NewLine+'Read https://aka.ms/MinecraftEULA. If you agree, edit eula=false to eula=true, save the file, then click Start Server again.'),'EULA required')|Out-Null; Start-Process notepad.exe -ArgumentList ('"'+$eula+'"'); Log ('Created or found EULA file: '+$eula+'. Start blocked until you accept it manually.');return}
   if($minehut.Checked) { Apply-MinehutSettings }
   $jvm=@('-Xms2G','-Xmx6G')
   if($minehut.Checked) {
